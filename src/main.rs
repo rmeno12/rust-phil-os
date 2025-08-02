@@ -10,11 +10,15 @@ use rust_phil_os::println;
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
-    // panic!("some message");
+
+    rust_phil_os::init();
+
+    x86_64::instructions::interrupts::int3();
 
     #[cfg(test)]
     test_main();
 
+    println!("no crash");
     loop {}
 }
 
@@ -30,4 +34,3 @@ fn panic(info: &PanicInfo) -> ! {
 fn panic(info: &PanicInfo) -> ! {
     rust_phil_os::test_panic_handler(info)
 }
-
