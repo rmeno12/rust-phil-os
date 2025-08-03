@@ -3,10 +3,11 @@ use pic8259::ChainedPics;
 use spin::Mutex;
 use x86_64::{
     instructions::port::Port,
-    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
+    registers::control::Cr2,
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use crate::{gdt, print, println};
+use crate::{gdt, hlt_loop, print, println};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -30,12 +31,17 @@ pub static PICS: Mutex<ChainedPics> =
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
+
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+
         // temporary workaround to fix regression in nightly compiler with externed functions with
         // return types: https://github.com/rust-lang/rust/pull/143075
         let double_fault_handler_ptr = double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64);
         let df_opts = idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
         unsafe { df_opts.set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); }
+
+        idt.page_fault.set_handler_fn(page_fault_handler);
+
         idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
         idt
@@ -91,6 +97,17 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    println!("EXCEPTION: PAGE FAULT");
+    println!("Accessed address: {:?}", Cr2::read());
+    println!("Error code: {error_code:?}");
+    println!("{:#?}", stack_frame);
+    hlt_loop();
 }
 
 #[test_case]

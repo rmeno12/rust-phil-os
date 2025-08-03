@@ -13,6 +13,11 @@ pub extern "C" fn _start() -> ! {
 
     rust_phil_os::init();
 
+    let ptr = 0xdeadbeef as *mut u8;
+    unsafe {
+        *ptr = 42;
+    }
+
     #[cfg(test)]
     test_main();
 
