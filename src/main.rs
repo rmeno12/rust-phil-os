@@ -17,6 +17,7 @@ pub extern "C" fn _start() -> ! {
     test_main();
 
     println!("no crash");
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
@@ -24,6 +25,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{info}");
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 

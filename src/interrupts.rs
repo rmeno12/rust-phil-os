@@ -1,7 +1,27 @@
 use lazy_static::lazy_static;
+use pic8259::ChainedPics;
+use spin::Mutex;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
-use crate::{gdt, println};
+use crate::{gdt, print, println};
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum InterruptIndex {
+    Timer = PIC_1_OFFSET,
+}
+
+impl InterruptIndex {
+    fn as_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+pub const PIC_1_OFFSET: u8 = 32;
+pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
+
+pub static PICS: Mutex<ChainedPics> =
+    Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
@@ -12,6 +32,7 @@ lazy_static! {
         let double_fault_handler_ptr = double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64);
         let df_opts = idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
         unsafe { df_opts.set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); }
+        idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         idt
     };
 }
@@ -26,6 +47,14 @@ extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
 
 extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, _error_code: u64) {
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+}
+
+extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    print!(".");
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
+    }
 }
 
 #[test_case]
