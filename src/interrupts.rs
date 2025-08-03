@@ -4,7 +4,10 @@ use spin::Mutex;
 use x86_64::{
     instructions::port::Port,
     registers::control::Cr2,
-    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+    structures::idt::{
+        DivergingHandlerFuncWithErrCode, HandlerFuncWithErrCode, InterruptDescriptorTable,
+        InterruptStackFrame, PageFaultErrorCode,
+    },
 };
 
 use crate::{gdt, hlt_loop, print, println};
@@ -36,8 +39,9 @@ lazy_static! {
 
         // temporary workaround to fix regression in nightly compiler with externed functions with
         // return types: https://github.com/rust-lang/rust/pull/143075
-        let double_fault_handler_ptr = double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64);
-        let df_opts = idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
+        let df_opts = idt.double_fault.set_handler_fn( unsafe {
+            core::mem::transmute::<HandlerFuncWithErrCode, DivergingHandlerFuncWithErrCode>(double_fault_handler)
+        });
         unsafe { df_opts.set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); }
 
         idt.page_fault.set_handler_fn(page_fault_handler);
@@ -84,12 +88,12 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     let mut port = Port::new(0x60);
 
     let scancode: u8 = unsafe { port.read() };
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => print!("{character}"),
-                DecodedKey::RawKey(key) => print!("{key:?}"),
-            }
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode)
+        && let Some(key) = keyboard.process_keyevent(key_event)
+    {
+        match key {
+            DecodedKey::Unicode(character) => print!("{character}"),
+            DecodedKey::RawKey(key) => print!("{key:?}"),
         }
     }
 

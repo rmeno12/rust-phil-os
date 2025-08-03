@@ -5,15 +5,18 @@
 use core::panic::PanicInfo;
 
 use lazy_static::lazy_static;
-use rust_phil_os::{exit_qemu, serial_print, serial_println, volatile::Volatile};
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use rust_phil_os::{exit_qemu, hlt_loop, serial_print, serial_println, volatile::Volatile};
+use x86_64::structures::idt::{
+    DivergingHandlerFuncWithErrCode, HandlerFuncWithErrCode, InterruptDescriptorTable,
+    InterruptStackFrame,
+};
 
 lazy_static! {
     static ref TEST_IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         let df_opts = idt.double_fault.set_handler_fn(unsafe {
-            core::mem::transmute(
-                test_double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64),
+            core::mem::transmute::<HandlerFuncWithErrCode, DivergingHandlerFuncWithErrCode>(
+                test_double_fault_handler,
             )
         });
         unsafe {
@@ -33,7 +36,7 @@ extern "x86-interrupt" fn test_double_fault_handler(
 ) {
     serial_println!("[ok]");
     exit_qemu(rust_phil_os::QemuExitCode::Success);
-    loop {}
+    hlt_loop();
 }
 
 #[unsafe(no_mangle)]
