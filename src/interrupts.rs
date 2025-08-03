@@ -11,8 +11,8 @@ lazy_static! {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         // temporary workaround to fix regression in nightly compiler with externed functions with
         // return types: https://github.com/rust-lang/rust/pull/143075
-        let double_fault_handler_ptr = unsafe { *(double_fault_handler as *mut DivergingHandlerFuncWithErrCode) };
-        idt.double_fault.set_handler_fn(double_fault_handler_ptr);
+        let double_fault_handler_ptr = double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64);
+        idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
         idt
     };
 }
