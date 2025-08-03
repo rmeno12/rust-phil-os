@@ -1,9 +1,7 @@
 use lazy_static::lazy_static;
-use x86_64::structures::idt::{
-    DivergingHandlerFuncWithErrCode, InterruptDescriptorTable, InterruptStackFrame,
-};
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
-use crate::println;
+use crate::{gdt, println};
 
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
@@ -12,7 +10,8 @@ lazy_static! {
         // temporary workaround to fix regression in nightly compiler with externed functions with
         // return types: https://github.com/rust-lang/rust/pull/143075
         let double_fault_handler_ptr = double_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame, u64);
-        idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
+        let df_opts = idt.double_fault.set_handler_fn(unsafe { core::mem::transmute(double_fault_handler_ptr)});
+        unsafe { df_opts.set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); }
         idt
     };
 }

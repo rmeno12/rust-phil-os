@@ -2,6 +2,10 @@
 pub struct Volatile<T>(T);
 
 impl<T> Volatile<T> {
+    pub fn new(val: T) -> Self {
+        Self(val)
+    }
+
     pub fn read(&mut self) -> T {
         unsafe { (&mut self.0 as *mut T).read_volatile() }
     }
