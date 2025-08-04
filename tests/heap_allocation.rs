@@ -10,7 +10,10 @@ use core::panic::PanicInfo;
 
 use alloc::{boxed::Box, vec::Vec};
 use bootloader::{BootInfo, entry_point};
-use rust_phil_os::{allocator::{self, HEAP_SIZE}, hlt_loop, memory};
+use rust_phil_os::{
+    allocator::{self, HEAP_SIZE},
+    hlt_loop, memory,
+};
 use x86_64::VirtAddr;
 
 entry_point!(main);
@@ -57,4 +60,14 @@ fn many_boxes() {
         let x = Box::new(i);
         assert_eq!(*x, i);
     }
+}
+
+#[test_case]
+fn many_boxes_long_lived() {
+    let long = Box::new(99);
+    for i in 0..HEAP_SIZE {
+        let x = Box::new(i);
+        assert_eq!(*x, i);
+    }
+    assert_eq!(*long, 99);
 }

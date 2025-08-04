@@ -1,4 +1,3 @@
-use linked_list_allocator::LockedHeap;
 use x86_64::{
     VirtAddr,
     structures::paging::{
@@ -6,11 +5,31 @@ use x86_64::{
     },
 };
 
-pub const HEAP_START: usize = 0x4444_4444_000;
+use crate::allocator::bump::BumpAllocator;
+
+pub mod bump;
+
+pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
+
+pub struct Locked<A> {
+    inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+    pub const fn new(inner: A) -> Self {
+        Self {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+
+    pub fn lock(&self) -> spin::MutexGuard<'_, A> {
+        self.inner.lock()
+    }
+}
 
 // Maps all the pages for kernel heap
 pub fn init_heap(
@@ -33,7 +52,12 @@ pub fn init_heap(
         unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
     }
 
-    unsafe { ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE) };
+    unsafe { ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE) };
 
     Ok(())
+}
+
+/// Requires `align` to be a power of two
+fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
 }
