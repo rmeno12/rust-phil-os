@@ -10,7 +10,7 @@ use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
 use rust_phil_os::{
     allocator, memory, println,
-    task::{Task, keyboard, simple_executor::SimpleExecutor},
+    task::{Task, executor::Executor, keyboard},
 };
 use x86_64::VirtAddr;
 
@@ -25,19 +25,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator =
         unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
-
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("kernel heap init failed");
-
-    let mut executor = SimpleExecutor::new();
-    executor.spawn(Task::new(example_task()));
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
 
     #[cfg(test)]
     test_main();
 
-    println!("no crash");
-    rust_phil_os::hlt_loop();
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.spawn(Task::new(keyboard::print_keypresses()));
+    executor.run();
 }
 
 async fn async_number() -> u32 {

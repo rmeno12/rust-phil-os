@@ -9,6 +9,7 @@ pub struct SimpleExecutor {
 }
 
 impl SimpleExecutor {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             task_queue: VecDeque::new(),
@@ -38,7 +39,7 @@ fn dummy_raw_waker() -> RawWaker {
     }
 
     let vtable = &RawWakerVTable::new(clone, no_op, no_op, no_op);
-    RawWaker::new(0 as *const (), vtable)
+    RawWaker::new(core::ptr::null::<()>(), vtable)
 }
 
 fn dummy_waker() -> Waker {

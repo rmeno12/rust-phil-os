@@ -15,7 +15,7 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 
 pub(crate) fn add_scancode(scancode: u8) {
     if let Ok(queue) = SCANCODE_QUEUE.try_get() {
-        if let Err(_) = queue.push(scancode) {
+        if queue.push(scancode).is_err() {
             println!("WARNING: scancode queue full; dropping keyboard input");
         } else {
             WAKER.wake();
@@ -30,6 +30,7 @@ pub struct ScancodeStream {
 }
 
 impl ScancodeStream {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         SCANCODE_QUEUE
             .try_init_once(|| ArrayQueue::new(100))
@@ -47,7 +48,7 @@ impl Stream for ScancodeStream {
             return Poll::Ready(Some(scancode));
         }
 
-        WAKER.register(&cx.waker());
+        WAKER.register(cx.waker());
         match queue.pop() {
             Some(scancode) => {
                 WAKER.take();
